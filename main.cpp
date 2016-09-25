@@ -68,14 +68,15 @@ public:
 };
 
 // enum EntityEnum {PLAYER, BOMB, BOX, EMPTY};
-enum EntityEnum {PLAYER, MYBOMB, OTHBOMB, BOX, DEADBOX, EMPTY};
+enum EntityEnum {PLAYER, MYBOMB, OTHBOMB, BOX, BOXAMMO, BOXRANGE, DEADBOX, ITEMAMMO, ITEMRANGE, EMPTY};
 class Entity
 {
 public: 
     Entity(): _ent(EMPTY) {};
     Entity(EntityEnum iEnt): _ent(iEnt) {};
     bool isBomb()   { return (_ent == MYBOMB || _ent == OTHBOMB); }
-    bool isBox()    { return (_ent == BOX || _ent == DEADBOX); }
+    bool isBox()    { return (_ent == BOX || _ent == DEADBOX || _ent == BOXAMMO || _ent == BOXRANGE); }
+    bool isItem()   { return (_ent == ITEMAMMO || _ent == ITEMRANGE); }
     bool operator== (EntityEnum iEnt) { return (_ent == iEnt); }
     bool operator!= (EntityEnum iEnt) { return !operator==(iEnt); }
     
@@ -112,6 +113,20 @@ public:
     int range;
 };
 
+enum ItemEnum {RANGE, AMMO};
+class Item
+{
+public: 
+    Item(): _type(RANGE) {};
+    Item(int iX, int iY, ItemEnum iType): coord(iX, iY), _type(iType) {};
+    bool operator== (ItemEnum iType) { return (_type == iType); }
+    bool operator!= (ItemEnum iType) { return !operator==(iType); }
+    
+    Coord coord;
+    ItemEnum _type;
+};
+
+
 typedef map<Coord, Entity> Grid;
 static Grid grid;
 void displayGrid()
@@ -127,6 +142,10 @@ void displayGrid()
             if ( grid[currentCoord] == OTHBOMB )    oss << "b";
             if ( grid[currentCoord] == BOX )        oss << "0";
             if ( grid[currentCoord] == DEADBOX )    oss << "X";
+            if ( grid[currentCoord] == BOXAMMO )    oss << "A";
+            if ( grid[currentCoord] == BOXRANGE )   oss << "R";
+            if ( grid[currentCoord] == ITEMAMMO )   oss << "a";
+            if ( grid[currentCoord] == ITEMRANGE )  oss << "r";
             if ( grid[currentCoord] == EMPTY )      oss << ".";
         }
         logINFO(oss.str());
@@ -136,6 +155,7 @@ void displayGrid()
 static Player myPlayer;
 static list<Player> listPlayer;
 static list<Bomb> listBomb;
+static list<Item> listItem;
 
 int turnsBeforeMyNextBomb()
 {
@@ -215,7 +235,7 @@ int calcBoxHitsOneDirection(const Bomb& iBomb, Direction iDir, bool markGrid)
         if ( itFind != grid.end() )
         {
             Entity entity = itFind->second;
-            if ( entity == BOX )
+            if ( entity.isBox() && entity != DEADBOX )
             {
                 logHITS("hit box" )
                 ++oHits;
@@ -286,9 +306,14 @@ void readGrid()
     {
         string row;
         getline(cin, row);
+        // logINFO(row)
         for (int x=0; x < maxX; ++x)
         {
-            grid[Coord(x,y)] = (row[x]=='0' ? Entity(BOX) : Entity(EMPTY) );
+            char tile = row[x];
+            if (tile=='0')      grid[Coord(x,y)] = Entity(BOX);
+            else if (tile=='1')      grid[Coord(x,y)] = Entity(BOXRANGE);
+            else if (tile=='2')      grid[Coord(x,y)] = Entity(BOXAMMO);
+            else                     grid[Coord(x,y)] = Entity(EMPTY);
         }
     }
     logINPUT("end readGrid")
@@ -330,6 +355,17 @@ void readEntities()
             
             if ( owner == myID )    grid[Coord(x,y)] = MYBOMB;
             else                    grid[Coord(x,y)] = OTHBOMB;
+        }
+        
+        // ITEM
+        if ( entityType == 2 )
+        {
+            ItemEnum itemType = ( param1 == 1 ? RANGE : AMMO );
+            Item currentItem(x, y, itemType);
+            listItem.push_back(currentItem);
+            
+            if ( itemType == RANGE )    grid[Coord(x,y)] = ITEMRANGE;
+            else                        grid[Coord(x,y)] = ITEMAMMO;
         }
     }
     
